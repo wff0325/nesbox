@@ -1,9 +1,9 @@
 name: Manual Build Nesbox
 
 on:
-  workflow_dispatch: # 允许你手动点击运行
+  workflow_dispatch:
   push:
-    branches: [ main, master ] # 提交代码时也会自动触发
+    branches: [ main, master ]
 
 jobs:
   build:
@@ -13,29 +13,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 1. 设置 Rust 环境 (核心模拟器需要)
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
+      # 2. 安装 wasm-pack (将 Rust 转为 WebAssembly)
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
+      # 3. 设置 Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
+      # 4. 安装所有依赖
       - name: Install dependencies
         run: npm install
 
-      - name: Build Project
-        run: npm run build
+      # 5. 【核心修正】按顺序构建：先 Rust，后 Web
+      - name: Build WASM Core
+        run: cd packages/nes && wasm-pack build --target web
 
-      # 将编译好的静态文件打包并上传到 GitHub Actions 页面
+      - name: Build WebApp Frontend
+        run: cd packages/webapp && npm run build
+
+      # 6. 打包产物
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nesbox-web-dist # 下载时的文件名
-          path: packages/webapp/dist/ # 编译结果所在的目录
+          name: nesbox-web-dist
+          path: packages/webapp/dist/ # 确保路径正确
