@@ -12,14 +12,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive  # <--- 【关键修正】自动拉取子模块依赖
 
-      # 1. 设置 Rust 环境 (核心模拟器需要)
+      # 1. 设置 Rust 环境
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      # 2. 安装 wasm-pack (将 Rust 转为 WebAssembly)
+      # 2. 安装 wasm-pack
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
@@ -30,20 +32,23 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 4. 安装所有依赖
+      # 4. 安装依赖
       - name: Install dependencies
         run: npm install
 
-      # 5. 【核心修正】按顺序构建：先 Rust，后 Web
+      # 5. 构建 WASM 核心
+      # 注意：如果项目根目录有 build 脚本，现在应该可以运行了。
+      # 如果还是不行，我们继续手动执行：
       - name: Build WASM Core
         run: cd packages/nes && wasm-pack build --target web
 
+      # 6. 构建 WebApp 前端
       - name: Build WebApp Frontend
         run: cd packages/webapp && npm run build
 
-      # 6. 打包产物
+      # 7. 打包产物
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: nesbox-web-dist
-          path: packages/webapp/dist/ # 确保路径正确
+          path: packages/webapp/dist/
