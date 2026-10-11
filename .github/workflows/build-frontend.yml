@@ -11,19 +11,25 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22 # 改为 Node 22
+          node-version: 22
 
-      - name: Install & Build
+      - name: Install dependencies
+        run: yarn install --ignore-engines
+
+      - name: Build webapp
         run: |
-          yarn install --ignore-engines
+          # 进入前端目录执行构建
+          cd packages/webapp
           yarn build
 
       - name: Package Dist
         run: |
-          if [ -d "packages/webapp/dist" ]; then
-            cd packages/webapp/dist && zip -r ../../../frontend.zip .
-          else
-            cd dist && zip -r ../frontend.zip .
+          cd packages/webapp
+          # 检查打包生成的静态目录（通常是 dist 或 build）
+          if [ -d "dist" ]; then
+            cd dist && zip -r ../../../frontend.zip .
+          elif [ -d "build" ]; then
+            cd build && zip -r ../../../frontend.zip .
           fi
 
       - uses: actions/upload-artifact@v4
