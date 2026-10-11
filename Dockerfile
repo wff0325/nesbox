@@ -7,30 +7,39 @@ COPY . .
 RUN yarn install && yarn build
 
 # ==========================================
-# 阶段 2: 编译后端服务 (Rust)
+# 阶段 2: 编译后端服务 (Rust 补齐 C 依赖)
 # ==========================================
-FROM rust:1.70 AS backend-builder
+FROM rust:1.75-bookworm AS backend-builder
 WORKDIR /app
+
+# 安装 Rust 编译 Diesel PostgreSQL 所需的底层库
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . .
-# 编译后端服务端程序
-RUN cargo build --release --bin server
+
+# 编译后端
+RUN cargo build --release --package server
 
 # ==========================================
-# 阶段 3: 最终运行镜像 (Nginx + 后端合体)
+# 阶段 3: 运行镜像 (Nginx 托管前端并反代后端)
 # ==========================================
 FROM nginx:alpine
 WORKDIR /app
 
-# 安装必要的依赖库
-RUN apk add --no-cache libgcc libstdc++ ca-certificates
+# 安装运行时依赖库 (libpq 用于运行时连接 postgres)
+RUN apk add --no-cache libgcc libstdc++ ca-certificates libpq
 
-# 1. 复制编译好的后端可执行文件
+# 复制编译好的后端二进制文件
 COPY --from=backend-builder /app/target/release/server /app/nesbox-server
 
-# 2. 复制编译好的前端网页文件到 Nginx 目录
+# 复制前端编译出的静态资源
 COPY --from=frontend-builder /app/packages/webapp/dist /usr/share/nginx/html
 
-# 3. 写入 Nginx 配置文件（同时处理前端网页 + 后端接口反代）
+# 写入合一的 Nginx 配置
 RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
     echo '    listen 80;' >> /etc/nginx/conf.d/default.conf && \
     echo '    location /graphql {' >> /etc/nginx/conf.d/default.conf && \
@@ -45,7 +54,7 @@ RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
     echo '    }' >> /etc/nginx/conf.d/default.conf && \
     echo '}' >> /etc/nginx/conf.d/default.conf
 
-# 4. 创建启动脚本：同时启动后端与 Nginx
+# 启动脚本
 RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
     echo '/app/nesbox-server &' >> /app/entrypoint.sh && \
     echo 'nginx -g "daemon off;"' >> /app/entrypoint.sh && \
