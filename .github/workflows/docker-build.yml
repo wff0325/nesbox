@@ -1,4 +1,4 @@
-name: nesbox
+name: Build and Push Docker Image
 
 on:
   workflow_dispatch: # 允许你在网页上手动点击按钮触发构建
