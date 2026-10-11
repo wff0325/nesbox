@@ -1,0 +1,32 @@
+name: Build Frontend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install & Build
+        run: |
+          yarn install
+          yarn build
+
+      - name: Package Dist
+        run: |
+          if [ -d "packages/webapp/dist" ]; then
+            cd packages/webapp/dist && zip -r ../../../frontend.zip .
+          else
+            cd dist && zip -r ../frontend.zip .
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-files
+          path: frontend.zip
